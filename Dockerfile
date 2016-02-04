@@ -1,4 +1,4 @@
-FROM     ubuntu:15.10
+FROM     ubuntu:16.04
 
 # ---------------- #
 #   Installation   #
@@ -9,45 +9,52 @@ ENV DEBIAN_FRONTEND noninteractive
 # Install all prerequisites
 # RUN     apt-get -y install software-properties-common
 # RUN     add-apt-repository -y ppa:chris-lea/node.js
-# RUN     apt-get -y update
-RUN     apt-get -y install python-django-tagging python-simplejson python-memcache python-ldap python-cairo python-pysqlite2 python-support \
-                           python-pip gunicorn supervisor nginx-light nodejs git wget curl openjdk-8-jre build-essential python-dev
+RUN apt-get -y update
+RUN apt-get -y upgrade
+RUN apt-get -y install python-support python-pip gunicorn supervisor \
+                       nginx-light nodejs git wget curl openjdk-8-jre build-essential python-dev
 
-RUN     pip install Twisted
-RUN     pip install Django
-RUN     pip install pytz
-RUN     npm install ini chokidar
+RUN pip install django-tagging
+RUN pip install simplejson
+RUN pip install memcache
+RUN pip install ldap
+RUN pip install cairo
+RUN pip install pysqlite2
+RUN pip install Twisted
+RUN pip install Django
+RUN pip install pytz
+RUN npm install ini chokidar
 
 # Checkout the stable branches of Graphite, Carbon and Whisper and install from there
-RUN     mkdir /src
-RUN     git clone https://github.com/graphite-project/whisper.git /src/whisper            &&\
-        cd /src/whisper                                                                   &&\
-        git checkout master                                                               &&\
-        python setup.py install
+RUN mkdir /src
+RUN git clone https://github.com/graphite-project/whisper.git /src/whisper            &&\
+    cd /src/whisper                                                                   &&\
+    git checkout master                                                               &&\
+    python setup.py install
 
-RUN     git clone https://github.com/graphite-project/carbon.git /src/carbon              &&\
-        cd /src/carbon                                                                    &&\
-        git checkout master                                                               &&\
-        python setup.py install
+RUN git clone https://github.com/graphite-project/carbon.git /src/carbon              &&\
+    cd /src/carbon                                                                    &&\
+    git checkout master                                                               &&\
+    python setup.py install
 
 
-RUN     git clone https://github.com/graphite-project/graphite-web.git /src/graphite-web  &&\
-        cd /src/graphite-web                                                              &&\
-        git checkout master                                                               &&\
-        python setup.py install
+RUN git clone https://github.com/graphite-project/graphite-web.git /src/graphite-web  &&\
+    cd /src/graphite-web                                                              &&\
+    git checkout master                                                               &&\
+    python setup.py install
 
 # Install StatsD
-RUN     git clone https://github.com/etsy/statsd.git /src/statsd                                                                        &&\
-        cd /src/statsd                                                                                                                  &&\
-        git checkout master
+RUN git clone https://github.com/etsy/statsd.git /src/statsd                          &&\
+    cd /src/statsd                                                                    &&\
+    git checkout master
 
 
 # Install Grafana
-RUN     mkdir /src/grafana                                                                                    &&\
-        mkdir /opt/grafana                                                                                    &&\
-        wget https://grafanarel.s3.amazonaws.com/builds/grafana-3.0.0-pre1.linux-x64.tar.gz -O /src/grafana.tar.gz &&\
-        tar -xzf /src/grafana.tar.gz -C /opt/grafana --strip-components=1                                     &&\
-        rm /src/grafana.tar.gz
+RUN mkdir /src/grafana                                                                &&\
+    mkdir /opt/grafana                                                                &&\
+    wget https://grafanarel.s3.amazonaws.com/builds/grafana-3.0.0-pre1.linux-x64.tar.gz -O /src/grafana.tar.gz &&\
+    tar -xzf /src/grafana.tar.gz -C /opt/grafana --strip-components=1                                     &&\
+    rm /src/grafana.tar.gz
 
 
 # ----------------- #
@@ -55,37 +62,37 @@ RUN     mkdir /src/grafana                                                      
 # ----------------- #
 
 # Confiure StatsD
-ADD     ./statsd/config.js /src/statsd/config.js
+ADD ./statsd/config.js /src/statsd/config.js
 
 # Configure Whisper, Carbon and Graphite-Web
-ADD     ./graphite/initial_data.json /opt/graphite/webapp/graphite/initial_data.json
-ADD     ./graphite/local_settings.py /opt/graphite/webapp/graphite/local_settings.py
-ADD     ./graphite/carbon.conf /opt/graphite/conf/carbon.conf
-ADD     ./graphite/storage-schemas.conf /opt/graphite/conf/storage-schemas.conf
-ADD     ./graphite/storage-aggregation.conf /opt/graphite/conf/storage-aggregation.conf
-RUN     mkdir -p /opt/graphite/storage/whisper
-RUN     touch /opt/graphite/storage/graphite.db /opt/graphite/storage/index
-RUN     chown -R www-data /opt/graphite/storage
-RUN     chmod 0775 /opt/graphite/storage /opt/graphite/storage/whisper
-RUN     chmod 0664 /opt/graphite/storage/graphite.db
-RUN     cd /opt/graphite/webapp/graphite && python manage.py syncdb --noinput
+ADD ./graphite/initial_data.json /opt/graphite/webapp/graphite/initial_data.json
+ADD ./graphite/local_settings.py /opt/graphite/webapp/graphite/local_settings.py
+ADD ./graphite/carbon.conf /opt/graphite/conf/carbon.conf
+ADD ./graphite/storage-schemas.conf /opt/graphite/conf/storage-schemas.conf
+ADD ./graphite/storage-aggregation.conf /opt/graphite/conf/storage-aggregation.conf
+RUN mkdir -p /opt/graphite/storage/whisper
+RUN touch /opt/graphite/storage/graphite.db /opt/graphite/storage/index
+RUN chown -R www-data /opt/graphite/storage
+RUN chmod 0775 /opt/graphite/storage /opt/graphite/storage/whisper
+RUN chmod 0664 /opt/graphite/storage/graphite.db
+RUN cd /opt/graphite/webapp/graphite && python manage.py syncdb --noinput
 
 # Configure Grafana
-ADD     ./grafana/custom.ini /opt/grafana/conf/custom.ini
+ADD ./grafana/custom.ini /opt/grafana/conf/custom.ini
 
 # Add the default dashboards
-RUN     mkdir /src/dashboards
-ADD     ./grafana/dashboards/* /src/dashboards/
-RUN     mkdir /src/dashboard-loader
-ADD     ./grafana/dashboard-loader/dashboard-loader.js /src/dashboard-loader/
+RUN mkdir /src/dashboards
+ADD ./grafana/dashboards/* /src/dashboards/
+RUN mkdir /src/dashboard-loader
+ADD ./grafana/dashboard-loader/dashboard-loader.js /src/dashboard-loader/
 
 # Configure nginx and supervisord
-ADD     ./nginx/nginx.conf /etc/nginx/nginx.conf
-ADD     ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+ADD ./nginx/nginx.conf /etc/nginx/nginx.conf
+ADD ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 
 # ---------------- #
-#   Expose Ports   #
+#Expose Ports#
 # ---------------- #
 
 # Grafana
@@ -103,7 +110,7 @@ EXPOSE 81
 
 
 # -------- #
-#   Run!   #
+#Run!#
 # -------- #
 
-CMD     ["/usr/bin/supervisord"]
+CMD  ["/usr/bin/supervisord"]
